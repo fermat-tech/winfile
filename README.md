@@ -9,7 +9,18 @@ winfile [OPTION...] FILE...
 
 ## Installation
 
-**Pre-built binary** — grab the latest `winfile_windows_amd64.zip` from the [Releases](https://github.com/fermat-tech/winfile/releases) page, extract `winfile.exe`, and put it on your `PATH`.
+**Pre-built binary** — grab the one for your platform from the [Releases](https://github.com/fermat-tech/winfile/releases) page and put it on your `PATH`. The binaries are self-contained, with nothing to extract or install.
+
+| Asset | Platform |
+|---|---|
+| `winfile_windows_amd64.exe` | Windows, x86-64 |
+| `winfile_windows_arm64.exe` | Windows, ARM64 |
+| `winfile_linux_amd64` | Linux, x86-64 |
+| `winfile_linux_arm64` | Linux, ARM64 |
+
+Rename it to `winfile.exe` (or `winfile`) once it is on your `PATH`: the binary
+takes its name from argv[0], so whatever you call it is what appears in its
+messages. On Linux, `chmod +x` it first.
 
 **From source** (requires Go 1.21+):
 
