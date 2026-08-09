@@ -1,0 +1,21 @@
+# Build output. The binaries are release assets, built from a tag, not source.
+/winfile
+/winfile.exe
+/winfile_*
+*.exe
+*.test
+*.prof
+coverage.out
+
+# Go tooling
+go.work
+go.work.sum
+vendor/
+
+# Editor and OS scratch
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
