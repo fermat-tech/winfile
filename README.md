@@ -144,6 +144,17 @@ interpreter path; GNU and Go build IDs; the `.note.ABI-tag` target OS and
 version; presence of `.debug_info`; stripped state; and, for core dumps, the
 dumping process, its real/effective uid and gid, `execfn` and `platform`.
 
+MIME output follows the object type the same way:
+
+| Object type | `--mime-type` |
+|---|---|
+| `ET_REL` (relocatable) | `application/x-object` |
+| `ET_EXEC` (executable) | `application/x-executable` |
+| `ET_DYN`, PIE | `application/x-pie-executable` |
+| `ET_DYN`, shared library | `application/x-sharedlib` |
+| `ET_CORE` (core dump) | `application/x-coredump` |
+| anything else | `application/octet-stream` |
+
 Two things are inferred rather than read from a field, matching what GNU
 `file` does:
 
@@ -155,7 +166,8 @@ Two things are inferred rather than read from a field, matching what GNU
 
 Verified against GNU `file` 5.41 over a 1348-file corpus (`/bin`, shared
 libraries, relocatable objects, static and PIE executables, Go binaries and a
-core dump): no differences in the ELF description.
+core dump): no differences in the ELF description, and none in `--mime-type`
+or `-i` output either.
 
 #### Known differences from GNU file
 
@@ -167,6 +179,7 @@ core dump): no differences in the ELF description.
 | `e_version` other than 1 | The header-only description is used, because Go's `debug/elf` rejects the file. Real toolchains always emit 1. |
 | NetBSD core dumps | Reported as `NetBSD-style`; the `NT_NETBSD_CORE_PROCINFO` fields (pid, uid, gid, signal) are not decoded. |
 | `setuid` / `setgid` prefix | Not reported. This comes from the file's permission bits, not from the ELF image, and Windows has no such bits. |
+| `--extension` | Reports `elf`; GNU `file` reports `???` for every ELF object type. |
 
 ### Text / source code
 

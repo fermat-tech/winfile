@@ -123,6 +123,10 @@ var (
 
 // elfHdr is the fixed ELF header, read straight out of the magic-byte window
 // at the byte offsets GNU file's magic entries use.
+//
+// Each field carries a "was it there" flag because file(1) reports exactly the
+// fields the available bytes cover: a 5-byte fragment yields "ELF 64-bit", an
+// 18-byte one adds the object type but neither the machine nor the version.
 type elfHdr struct {
 	class   byte // EI_CLASS: 1 = 32-bit, 2 = 64-bit
 	data    byte // EI_DATA: 1 = LSB, 2 = MSB
@@ -134,21 +138,42 @@ type elfHdr struct {
 	flags   uint32 // e_flags, at the offset for this class
 	flags64 uint32 // e_flags read at offset 48 regardless of class (see elfMachineText)
 	shnum   uint16
-	fields  bool // EI_DATA was 1 or 2, so the type/machine/version fields apply
+
+	hasClass   bool
+	hasData    bool
+	hasOSABI   bool
+	hasType    bool
+	hasMachine bool
+	hasVersion bool
+
+	fields bool // EI_DATA was 1 or 2, so the type/machine/version fields apply
 }
 
 func parseELFHdr(buf []byte) elfHdr {
-	h := elfHdr{class: buf[4], data: buf[5], osabi: buf[7], bo: binary.LittleEndian}
+	h := elfHdr{bo: binary.LittleEndian}
+	if len(buf) >= 5 {
+		h.class, h.hasClass = buf[4], true
+	}
+	if len(buf) >= 6 {
+		h.data, h.hasData = buf[5], true
+	}
+	if len(buf) >= 8 {
+		h.osabi, h.hasOSABI = buf[7], true
+	}
 	// file(1) compares the host byte order against EI_DATA, so anything
 	// other than ELFDATA2LSB is treated as big-endian.
 	if h.data != 1 {
 		h.bo = binary.BigEndian
 	}
 	h.fields = h.data == 1 || h.data == 2
+	if len(buf) >= 18 {
+		h.etype, h.hasType = h.bo.Uint16(buf[16:]), true
+	}
+	if len(buf) >= 20 {
+		h.machine, h.hasMachine = h.bo.Uint16(buf[18:]), true
+	}
 	if len(buf) >= 24 {
-		h.etype = h.bo.Uint16(buf[16:])
-		h.machine = h.bo.Uint16(buf[18:])
-		h.version = h.bo.Uint32(buf[20:])
+		h.version, h.hasVersion = h.bo.Uint32(buf[20:]), true
 	}
 	switch h.class {
 	case 1:
@@ -172,9 +197,6 @@ func parseELFHdr(buf []byte) elfHdr {
 // did not come from a seekable file (stdin, or a payload unwrapped from a
 // compressed outer file), in which case only the header fields are reported.
 func elfDetail(buf []byte, path string) *magicResult {
-	if len(buf) < 20 {
-		return &magicResult{desc: "ELF binary", mime: "application/x-elf", ext: "elf"}
-	}
 	if path != "" {
 		if mr := elfAnalyse(buf, path); mr != nil {
 			return mr
@@ -183,8 +205,12 @@ func elfDetail(buf []byte, path string) *magicResult {
 	return elfHeaderOnly(buf)
 }
 
-func elfResult(desc string) *magicResult {
-	return &magicResult{desc: desc, mime: "application/x-elf", ext: "elf"}
+func elfResult(h elfHdr, pie bool, detail string) *magicResult {
+	return &magicResult{
+		desc: elfPrefix(h, pie) + detail,
+		mime: elfMIME(h, pie),
+		ext:  "elf",
+	}
 }
 
 // elfHeaderOnly describes an ELF image from the magic-byte window alone.
@@ -192,7 +218,39 @@ func elfHeaderOnly(buf []byte) *magicResult {
 	h := parseELFHdr(buf)
 	// Without the program headers there is no way to tell a PIE executable
 	// from a shared library, so report the conservative "shared object".
-	return elfResult(elfPrefix(h, false))
+	return elfResult(h, false, "")
+}
+
+// elfMIME maps the object type to the MIME type GNU file reports. Types with
+// no mapping of their own fall back to the generic binary type, which is what
+// file(1) ends up printing for them.
+func elfMIME(h elfHdr, pie bool) string {
+	mime := "application/octet-stream"
+	if !h.fields || !h.hasType {
+		return mime
+	}
+	switch h.etype {
+	case 1:
+		mime = "application/x-object"
+	case 2:
+		mime = "application/x-executable"
+	case 3:
+		if pie {
+			mime = "application/x-pie-executable"
+		} else {
+			mime = "application/x-sharedlib"
+		}
+	case 4:
+		mime = "application/x-coredump"
+	}
+	// The two OS- and processor-specific overrides, in magic-file order.
+	if h.osabi == 202 && h.etype == 0xFE01 {
+		mime = "application/x-executable"
+	}
+	if h.etype&0xff00 != 0 && h.machine == 8 && h.etype == 0xFF80 {
+		mime = "application/x-sharedlib"
+	}
+	return mime
 }
 
 // elfPrefix renders the part of the description that comes from the ELF
@@ -202,38 +260,50 @@ func elfHeaderOnly(buf []byte) *magicResult {
 func elfPrefix(h elfHdr, pie bool) string {
 	var b strings.Builder
 	b.WriteString("ELF")
-	switch h.class {
-	case 0:
-		b.WriteString(" invalid class")
-	case 1:
-		b.WriteString(" 32-bit")
-	case 2:
-		b.WriteString(" 64-bit")
+	if h.hasClass {
+		switch h.class {
+		case 0:
+			b.WriteString(" invalid class")
+		case 1:
+			b.WriteString(" 32-bit")
+		case 2:
+			b.WriteString(" 64-bit")
+		}
 	}
-	switch h.data {
-	case 0:
-		b.WriteString(" invalid byte order")
-	case 1:
-		b.WriteString(" LSB")
-	case 2:
-		b.WriteString(" MSB")
+	if h.hasData {
+		switch h.data {
+		case 0:
+			b.WriteString(" invalid byte order")
+		case 1:
+			b.WriteString(" LSB")
+		case 2:
+			b.WriteString(" MSB")
+		}
 	}
 	if h.fields {
-		for _, s := range elfTypeText(h, pie) {
-			b.WriteString(" " + s)
+		if h.hasType {
+			for _, s := range elfTypeText(h, pie) {
+				b.WriteString(" " + s)
+			}
 		}
-		if s := elfMachineText(h); s != "" {
-			b.WriteString(" " + s)
+		if h.hasMachine {
+			if s := elfMachineText(h); s != "" {
+				b.WriteString(" " + s)
+			}
 		}
-		switch h.version {
-		case 0:
-			b.WriteString(" invalid version")
-		case 1:
-			b.WriteString(" version 1")
+		if h.hasVersion {
+			switch h.version {
+			case 0:
+				b.WriteString(" invalid version")
+			case 1:
+				b.WriteString(" version 1")
+			}
 		}
 	}
-	if s, ok := elfOSABI[h.osabi]; ok {
-		b.WriteString(" " + s)
+	if h.hasOSABI {
+		if s, ok := elfOSABI[h.osabi]; ok {
+			b.WriteString(" " + s)
+		}
 	}
 	return b.String()
 }
@@ -411,7 +481,7 @@ func elfAnalyse(buf []byte, path string) *magicResult {
 		st.sections()
 	}
 
-	return elfResult(elfPrefix(st.hdr, pie) + st.det.String())
+	return elfResult(st.hdr, pie, st.det.String())
 }
 
 // readSeg returns up to elfSegReadMax bytes of a program header's payload.
