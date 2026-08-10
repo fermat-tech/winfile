@@ -50,16 +50,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 )
 
-// version is stamped at build time by the release process via
-// -ldflags "-X main.version=vX.Y.Z". A plain `go build` leaves it "dev", so an
-// unstamped binary says so instead of claiming a release it is not.
-var version = "dev"
+// version is overridden at build time via -ldflags "-X main.version=vX.Y.Z"
+// for release binaries. For `go install` users it falls back to the module
+// version embedded in the binary by the Go toolchain. Local `go build` without
+// ldflags reports "dev".
+var version = ""
 
 type options struct {
 	brief            bool   // -b
@@ -87,6 +89,13 @@ var programName string
 
 func init() {
 	programName = strings.TrimSuffix(filepath.Base(os.Args[0]), filepath.Ext(os.Args[0]))
+	if version == "" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		} else {
+			version = "dev"
+		}
+	}
 }
 
 func main() {
