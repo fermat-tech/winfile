@@ -29,23 +29,19 @@ go install github.com/fermat-tech/winfile@latest
 ```
 
 This builds and places `winfile.exe` in your `GOBIN` directory (typically
-`%USERPROFILE%\go\bin`), which should already be on your `PATH`. `winfile
---version` reports the version you installed.
+`%USERPROFILE%\go\bin`), which should already be on your `PATH`.
+`winfile --version` reports the version you installed.
 
 **Build locally:**
 
 ```powershell
 git clone https://github.com/fermat-tech/winfile
 cd winfile
-go build -trimpath -ldflags "-X main.version=v1.1.1" -o winfile.exe .
+go build -trimpath -o winfile.exe .
 ```
 
-The `-ldflags` part sets the version explicitly, which is how release binaries
-are built. Omit it for a quick local build and `winfile --version` reports the
-version Go infers from the checkout instead — the tag you are sitting on, with
-`+dirty` appended if you have uncommitted changes, or `dev` if there is no
-version information to read. `-trimpath` keeps absolute build paths out of the
-binary.
+`winfile --version` reports the release the clone is checked out at.
+`-trimpath` keeps absolute build paths out of the binary.
 
 ## Usage
 
