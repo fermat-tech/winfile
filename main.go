@@ -56,7 +56,10 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-const version = "1.1.0"
+// version is stamped at build time by the release process via
+// -ldflags "-X main.version=vX.Y.Z". A plain `go build` leaves it "dev", so an
+// unstamped binary says so instead of claiming a release it is not.
+var version = "dev"
 
 type options struct {
 	brief            bool   // -b
