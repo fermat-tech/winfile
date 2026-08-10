@@ -209,7 +209,10 @@ func elfResult(h elfHdr, pie bool, detail string) *magicResult {
 	return &magicResult{
 		desc: elfPrefix(h, pie) + detail,
 		mime: elfMIME(h, pie),
-		ext:  "elf",
+		// GNU file lists no extension for any ELF object type: on the systems
+		// that run them, ELF executables and shared libraries are identified
+		// by content, not by suffix.
+		ext: "???",
 	}
 }
 

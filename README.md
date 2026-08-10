@@ -166,8 +166,8 @@ Two things are inferred rather than read from a field, matching what GNU
 
 Verified against GNU `file` 5.41 over a 1348-file corpus (`/bin`, shared
 libraries, relocatable objects, static and PIE executables, Go binaries and a
-core dump): no differences in the ELF description, and none in `--mime-type`
-or `-i` output either.
+core dump): no differences in the ELF description, and none in `--mime-type`,
+`-i` or `--extension` output either.
 
 #### Known differences from GNU file
 
@@ -179,7 +179,6 @@ or `-i` output either.
 | `e_version` other than 1 | The header-only description is used, because Go's `debug/elf` rejects the file. Real toolchains always emit 1. |
 | NetBSD core dumps | Reported as `NetBSD-style`; the `NT_NETBSD_CORE_PROCINFO` fields (pid, uid, gid, signal) are not decoded. |
 | `setuid` / `setgid` prefix | Not reported. This comes from the file's permission bits, not from the ELF image, and Windows has no such bits. |
-| `--extension` | Reports `elf`; GNU `file` reports `???` for every ELF object type. |
 
 ### Text / source code
 
