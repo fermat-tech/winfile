@@ -145,7 +145,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion || *showVersion2 {
-		fmt.Fprintf(os.Stdout, "%s-%s\n", programName, version)
+		fmt.Fprintf(os.Stdout, "%s %s\n", programName, version)
 		os.Exit(0)
 	}
 
