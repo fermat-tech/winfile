@@ -109,7 +109,7 @@ ntdll.dll:     PE32+ DLL (x86-64), for MS Windows
 
 | Category | Formats |
 |----------|---------|
-| Executables | PE (EXE/DLL/OBJ), ELF, Mach-O |
+| Executables | PE (EXE/DLL/OBJ), ELF ([full detail](#elf-detail)), Mach-O |
 | Archives | ZIP, gzip, bzip2, XZ, zstd, LZ4, lzip, LZMA, 7-Zip, RAR, tar (ustar/GNU), Cabinet, ar |
 | Office (OOXML) | DOCX, XLSX, PPTX (detected inside ZIP) |
 | Office (legacy) | OLE2 compound document (DOC, XLS, PPT, MSG) |
@@ -123,6 +123,50 @@ ntdll.dll:     PE32+ DLL (x86-64), for MS Windows
 | Bytecode | Java `.class`, Python `.pyc` |
 | Crypto | PEM, DER (X.509) |
 | Containers | EPUB, JAR, APK (detected inside ZIP) |
+
+<a name="elf-detail"></a>
+### ELF detail
+
+ELF images are described the way GNU `file` describes them, not just by class
+and object type:
+
+```
+$ winfile -b /bin/ls
+ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=897a5bd7…, for GNU/Linux 3.2.0, stripped
+
+$ winfile -b core.1234
+ELF 64-bit LSB core file, x86-64, version 1 (SYSV), SVR4-style, from '/usr/bin/crasher', real uid: 1000, effective uid: 1000, real gid: 1000, effective gid: 1000, execfn: '/usr/bin/crasher', platform: 'x86_64'
+```
+
+Reported: object type, machine, ELF version and OS/ABI; linkage
+(`dynamically` / `statically` / `static-pie` linked); the `PT_INTERP`
+interpreter path; GNU and Go build IDs; the `.note.ABI-tag` target OS and
+version; presence of `.debug_info`; stripped state; and, for core dumps, the
+dumping process, its real/effective uid and gid, `execfn` and `platform`.
+
+Two things are inferred rather than read from a field, matching what GNU
+`file` does:
+
+- **`pie executable` vs `shared object`.** Both are `ET_DYN`. An image whose
+  `.dynamic` section carries `DT_FLAGS_1` with `DF_1_PIE` is reported as a PIE
+  executable; otherwise it is a shared library.
+- **`static-pie linked`.** An image with a `.dynamic` section but no
+  interpreter and no `DT_NEEDED` entries has nothing to bind at run time.
+
+Verified against GNU `file` 5.41 over a 1348-file corpus (`/bin`, shared
+libraries, relocatable objects, static and PIE executables, Go binaries and a
+core dump): no differences in the ELF description.
+
+#### Known differences from GNU file
+
+| Case | Behavior |
+|------|----------|
+| Uncommon `e_machine` values | Only x86-64, i386, ARM, AArch64, RISC-V and 64-bit PowerPC are named (with their flag-derived ABI suffixes). Other machines are left unnamed rather than guessed at, so the description omits the architecture instead of printing `*unknown arch 0x…*`. |
+| Non-seekable input | Reading a compressed payload with `-z` yields the header-only description — class, byte order, type, machine, version, OS/ABI. GNU `file` behaves the same way here. |
+| Truncated or malformed images | If the ELF structure will not parse, winfile reports the header-only description. GNU `file` reports as much as it decoded plus an error fragment such as `missing section headers at 14408`. |
+| `e_version` other than 1 | The header-only description is used, because Go's `debug/elf` rejects the file. Real toolchains always emit 1. |
+| NetBSD core dumps | Reported as `NetBSD-style`; the `NT_NETBSD_CORE_PROCINFO` fields (pid, uid, gid, signal) are not decoded. |
+| `setuid` / `setgid` prefix | Not reported. This comes from the file's permission bits, not from the ELF image, and Windows has no such bits. |
 
 ### Text / source code
 

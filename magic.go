@@ -36,7 +36,12 @@ type magicResult struct {
 
 // detectMagic inspects raw bytes and returns the best match.
 // It checks only the first ~262 bytes (standard magic window).
-func detectMagic(buf []byte, size int64) *magicResult {
+//
+// path names the file the bytes came from, or is empty when they came from a
+// stream that cannot be re-read (stdin, or a payload unwrapped from a
+// compressed outer file). Sub-detectors that need to seek — currently only
+// [elfDetail] — use it and fall back to a header-only reading without it.
+func detectMagic(buf []byte, size int64, path string) *magicResult {
 	if len(buf) == 0 || size == 0 {
 		return &magicResult{desc: "empty", mime: "inode/x-empty", ext: "???"}
 	}
@@ -46,7 +51,7 @@ func detectMagic(buf []byte, size int64) *magicResult {
 		return peDetail(buf)
 	}
 	if has(buf, 0, "\x7fELF") {
-		return elfDetail(buf)
+		return elfDetail(buf, path)
 	}
 	if has(buf, 0, "\xfe\xed\xfa\xce") || has(buf, 0, "\xce\xfa\xed\xfe") ||
 		has(buf, 0, "\xfe\xed\xfa\xcf") || has(buf, 0, "\xcf\xfa\xed\xfe") {
@@ -447,42 +452,6 @@ func peDetail(buf []byte) *magicResult {
 		desc: bits + " " + kind + " (" + arch + "), for MS Windows",
 		mime: "application/x-dosexec",
 		ext:  ext,
-	}
-}
-
-func elfDetail(buf []byte) *magicResult {
-	if len(buf) < 20 {
-		return &magicResult{desc: "ELF binary", mime: "application/x-elf", ext: "elf"}
-	}
-	bits := "32-bit"
-	if buf[4] == 2 {
-		bits = "64-bit"
-	}
-	endian := "LSB"
-	if buf[5] == 2 {
-		endian = "MSB"
-	}
-	var kind string
-	etype := uint16(buf[16]) | uint16(buf[17])<<8
-	if buf[5] == 2 { // big-endian
-		etype = uint16(buf[16])<<8 | uint16(buf[17])
-	}
-	switch etype {
-	case 1:
-		kind = "relocatable"
-	case 2:
-		kind = "executable"
-	case 3:
-		kind = "shared object"
-	case 4:
-		kind = "core file"
-	default:
-		kind = "unknown type"
-	}
-	return &magicResult{
-		desc: "ELF " + bits + " " + endian + " " + kind,
-		mime: "application/x-elf",
-		ext:  "elf",
 	}
 }
 

@@ -27,7 +27,9 @@
 //
 // Detection coverage
 //
-// Binary formats: PE (EXE/DLL), ELF, Mach-O, ZIP and OOXML derivatives
+// Binary formats: PE (EXE/DLL), ELF (reported in GNU file's full detail —
+// linkage, interpreter, build ID, ABI tag, stripped state, core-dump
+// provenance; see elf.go), Mach-O, ZIP and OOXML derivatives
 // (DOCX/XLSX/PPTX/JAR/APK/EPUB), gzip, bzip2, XZ, zstd, LZ4, 7-Zip, RAR,
 // tar (POSIX ustar), PNG, JPEG, GIF, BMP, TIFF, WebP, AVIF/HEIF, ICO, PDF,
 // PostScript, OLE2 (legacy Office), SQLite, Java .class, MKV/WebM, MP4/MOV,
@@ -54,7 +56,7 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-const version = "1.0.0"
+const version = "1.1.0"
 
 type options struct {
 	brief            bool   // -b

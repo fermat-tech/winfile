@@ -154,7 +154,7 @@ func analyseFile(path string, opts *options) fileResult {
 
 func doAnalyse(path string, buf []byte, size int64, opts *options, res fileResult) fileResult {
 	// Try magic detection first
-	mr := detectMagic(buf, size)
+	mr := detectMagic(buf, size, path)
 
 	if mr != nil {
 		res.desc = mr.desc
@@ -166,7 +166,9 @@ func doAnalyse(path string, buf []byte, size int64, opts *options, res fileResul
 			inner, innerName, err := decompressFirst(buf, mr.mime, path)
 			if err == nil && len(inner) > 0 {
 				var innerDesc, innerMime, innerExt string
-				innerMR := detectMagic(inner, int64(len(inner)))
+				// The unwrapped bytes are in memory only, so seek-based
+				// sub-detectors have no file to work from.
+				innerMR := detectMagic(inner, int64(len(inner)), "")
 				if innerMR != nil {
 					innerDesc, innerMime, innerExt = innerMR.desc, innerMR.mime, innerMR.ext
 				} else if tr2 := detectText(inner); tr2 != nil {
