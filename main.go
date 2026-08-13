@@ -168,9 +168,14 @@ func main() {
 		}
 		paths = append(paths, listed...)
 	}
-	paths = append(paths, flag.Args()...)
+	args := flag.Args()
+	paths = append(paths, expandGlobs(args)...)
 
 	if len(paths) == 0 {
+		if len(args) > 0 || opts.filesFrom != "" {
+			// Had input but globs matched nothing — already printed errors above.
+			os.Exit(1)
+		}
 		usage()
 		os.Exit(1)
 	}
@@ -345,8 +350,36 @@ Unsupported (Windows has no equivalent):
 `, programName)
 }
 
+// expandGlobs performs Windows-side glob expansion on each path.
+// The Windows shell does not expand wildcards before passing arguments to
+// programs (unlike bash), so programs must do it themselves.
+// Patterns that match nothing are left as-is, matching GNU file's behaviour.
+func expandGlobs(paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if !strings.ContainsAny(p, "*?[") {
+			out = append(out, p)
+			continue
+		}
+		matches, err := filepath.Glob(p)
+		if err != nil {
+			out = append(out, p) // malformed pattern; let analyseFile report the error
+			continue
+		}
+		if len(matches) == 0 {
+			// No matches: emit a sentinel that analyseFile will report as "not found"
+			// rather than letting the raw glob pattern reach the OS (Windows rejects
+			// filenames containing * and ? with a confusing "syntax incorrect" error).
+			fmt.Fprintf(os.Stderr, "%s: %s: No such file or directory\n", programName, p)
+			continue
+		}
+		out = append(out, matches...)
+	}
+	return out
+}
+
 // excludeFlag allows -e to be repeated.
 type excludeFlag []string
 
-func (e *excludeFlag) String() string  { return strings.Join(*e, ",") }
+func (e *excludeFlag) String() string     { return strings.Join(*e, ",") }
 func (e *excludeFlag) Set(v string) error { *e = append(*e, v); return nil }
